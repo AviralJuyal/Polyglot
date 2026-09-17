@@ -1,0 +1,56 @@
+{
+  "providers": {
+    "anthropic": {
+      "adapter": "anthropic",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "models": {
+        "anthropic:claude-haiku-4-5-20251001": {
+          "providerModelId": "claude-haiku-4-5-20251001",
+          "contextWindow": 200000,
+          "capabilities": { "tools": true, "vision": true, "jsonSchema": false, "streaming": true },
+          "pricing": { "inputPerMTok": 1, "outputPerMTok": 5, "cachedInputPerMTok": 0.1 },
+          "pricingSource": "https://platform.claude.com/docs/en/about-claude/pricing"
+        }
+      }
+    },
+    "gemini": {
+      "adapter": "gemini",
+      "apiKeyEnv": "GEMINI_API_KEY",
+      "models": {
+        "gemini:gemini-2.5-flash": {
+          "providerModelId": "gemini-2.5-flash",
+          "contextWindow": 1048576,
+          "capabilities": { "tools": true, "vision": true, "jsonSchema": true, "streaming": true },
+          "pricing": { "inputPerMTok": 0.3, "outputPerMTok": 2.5, "cachedInputPerMTok": 0.03 },
+          "pricingSource": "https://ai.google.dev/gemini-api/docs/pricing"
+        }
+      },
+      "embeddingModels": {
+        "gemini:gemini-embedding-001": { "providerModelId": "gemini-embedding-001" }
+      }
+    },
+    "openai": {
+      "adapter": "openai",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "models": {
+        "openai:gpt-4.1-mini": {
+          "providerModelId": "gpt-4.1-mini",
+          "contextWindow": 1047576,
+          "capabilities": { "tools": true, "vision": true, "jsonSchema": true, "streaming": true },
+          "pricing": { "inputPerMTok": 0.4, "outputPerMTok": 1.6, "cachedInputPerMTok": 0.1 },
+          "pricingSource": "https://developers.openai.com/api/docs/models/gpt-4.1-mini"
+        }
+      },
+      "embeddingModels": {
+        "openai:text-embedding-3-small": { "providerModelId": "text-embedding-3-small" }
+      }
+    }
+  },
+  "defaultModel": "gemini:gemini-2.5-flash",
+  "defaultEmbeddingModel": "gemini:gemini-embedding-001",
+  "fallbackChains": {
+    "gemini:gemini-2.5-flash": ["openai:gpt-4.1-mini", "anthropic:claude-haiku-4-5-20251001"],
+    "openai:gpt-4.1-mini": ["gemini:gemini-2.5-flash"],
+    "anthropic:claude-haiku-4-5-20251001": ["gemini:gemini-2.5-flash"]
+  }
+}

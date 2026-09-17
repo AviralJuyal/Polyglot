@@ -26,6 +26,8 @@ export function createProvider({ name, apiKey, fetchImpl = fetch }) {
       if (!apiKey) throw new ProviderError('auth', name, `${name} API key is not configured`);
       const model = modelConfig(request.model);
       const body = { contents: toGeminiContents(request), generationConfig: { maxOutputTokens: request.maxTokens || 1024 } };
+      // A bounded 2.5 Flash thinking budget leaves room for visible output under maxOutputTokens.
+      if (model.thinkingBudget !== undefined) body.generationConfig.thinkingConfig = { thinkingBudget: model.thinkingBudget };
       if (request.system) body.systemInstruction = { parts: [{ text: request.system }] };
       if (request.temperature !== undefined) body.generationConfig.temperature = request.temperature;
       if (request.tools?.length) body.tools = [{ functionDeclarations: request.tools.map(tool => ({

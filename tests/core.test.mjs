@@ -9,6 +9,7 @@ const storage = await import('../src/storage.mjs');
 const session = await import('../src/session.mjs');
 const { chunkText, cosine, validateRetrievalSettings } = await import('../src/rag.mjs');
 const { calculate } = await import('../src/tools.mjs');
+const { costUsd } = await import('../src/config.mjs');
 
 test('tenant databases cannot read each other through ordinary queries', () => {
   const a = storage.tenantDb('tenant-a');
@@ -38,4 +39,9 @@ test('chunking overlaps and retrieval threshold validates input', () => {
   assert.ok(chunks.length > 1);
   assert.ok(cosine([1, 0], [1, 0]) > 0.99);
   assert.throws(() => validateRetrievalSettings({ chunkSize: 400, overlap: 250 }));
+});
+
+test('Gemini cost includes separately reported thinking tokens', () => {
+  const cost = costUsd('gemini:gemini-2.5-flash', { inputTokens: 10, outputTokens: 20, reasoningTokens: 30 });
+  assert.equal(cost, (10 * 0.3 + 50 * 2.5) / 1_000_000);
 });

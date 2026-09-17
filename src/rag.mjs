@@ -62,7 +62,10 @@ async function extractPdf(buffer) {
     child.on('error', () => { clearTimeout(timer); reject(new InputError('PDF extraction is unavailable')); });
     child.on('close', code => {
       clearTimeout(timer);
-      if (code !== 0) reject(new InputError(`Could not read PDF: ${Buffer.concat(errors).toString('utf8').slice(0, 150)}`));
+      if (code !== 0) {
+        console.error('PDF extraction failed:', Buffer.concat(errors).toString('utf8').slice(0, 500));
+        reject(new InputError('Could not extract text from PDF'));
+      }
       else resolve(Buffer.concat(output).toString('utf8'));
     });
     child.stdin.end(buffer);
@@ -87,9 +90,10 @@ async function embedChunks(chunks, embeddingModel, signal) {
   const { provider, config } = await providerForEmbedding(embeddingModel);
   if (!provider.embed) throw new InputError('Selected provider does not support embeddings');
   // Batch where possible; Gemini adapter currently serializes calls to avoid rate bursts.
+  const boundedSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000);
   const vectors = [];
   for (let i = 0; i < chunks.length; i += 16) {
-    vectors.push(...await provider.embed(chunks.slice(i, i + 16), config.providerModelId, signal));
+    vectors.push(...await provider.embed(chunks.slice(i, i + 16), config.providerModelId, boundedSignal));
   }
   return vectors;
 }

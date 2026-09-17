@@ -53,7 +53,8 @@ export function calculate(expression) {
 
 async function weather(city, signal) {
   if (typeof city !== 'string' || city.length < 2 || city.length > 80) throw new InputError('City must be 2–80 characters');
-  const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`, { signal });
+  const boundedSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
+  const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`, { signal: boundedSignal });
   if (!geo.ok) throw new Error('Weather lookup is unavailable');
   const place = (await geo.json()).results?.[0];
   if (!place) return { error: 'City not found' };
@@ -61,7 +62,7 @@ async function weather(city, signal) {
   url.searchParams.set('latitude', String(place.latitude));
   url.searchParams.set('longitude', String(place.longitude));
   url.searchParams.set('current', 'temperature_2m,relative_humidity_2m,weather_code');
-  const response = await fetch(url, { signal });
+  const response = await fetch(url, { signal: boundedSignal });
   if (!response.ok) throw new Error('Weather lookup is unavailable');
   return { location: `${place.name}, ${place.country}`, current: (await response.json()).current };
 }
@@ -74,8 +75,9 @@ export async function executeTool(name, input, { db, collectionId, retrieval, si
     if (!collectionId) return JSON.stringify({ error: 'No document collection selected' });
     if (typeof input.query !== 'string' || !input.query.trim() || input.query.length > 1000) throw new InputError('Invalid document query');
     const matches = await retrieve(db, collectionId, input.query, retrieval, signal);
-    return JSON.stringify({ matches: matches.map((item, index) => ({ citation: `C${index + 1}`,
-      chunkId: item.id, filename: item.filename, text: item.text, score: item.score })) });
+    // Citation labels are assigned by the chat orchestrator across all searches in a turn.
+    return JSON.stringify({ matches: matches.map(item => ({ chunkId: item.id,
+      filename: item.filename, ordinal: item.ordinal, text: item.text, score: item.score })) });
   }
   throw new InputError('Unknown tool');
 }

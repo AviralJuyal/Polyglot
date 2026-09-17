@@ -86,6 +86,7 @@ function newConversation() {
 }
 
 function bubble(role, modelId = '') {
+  $('messages').querySelector('.empty-state')?.remove();
   const element = document.createElement('div');
   element.className = `message ${role}`;
   if (modelId) {
@@ -102,6 +103,7 @@ function bubble(role, modelId = '') {
 }
 
 function renderCitedText(container, text, citations) {
+  // Build DOM nodes instead of inserting model text as HTML; uploaded documents are untrusted.
   container.replaceChildren();
   const byLabel = new Map(citations.map(item => [item.citation || item.label, item.chunkId]));
   const pattern = /\[(C\d+)\]/g;
@@ -122,6 +124,7 @@ function renderCitedText(container, text, citations) {
 }
 
 async function showChunk(id) {
+  // The server resolves this ID inside the signed-in tenant's database only.
   try {
     const chunk = await api(`/api/chunks/${id}`);
     $('chunk-title').textContent = `${chunk.filename} · chunk ${chunk.ordinal}`;
@@ -221,11 +224,12 @@ async function sendChat(event) {
         view.element.querySelector('.meta').textContent = `${item.modelId} · ${item.costUsd == null ? 'cost unavailable' : '$' + item.costUsd.toFixed(5)}`;
       }
       if (item.type === 'done') renderCitedText(view.body, answer, state.matches);
-      if (item.type === 'error') showNotice(item.error.message);
+      if (item.type === 'error') { showNotice(item.error.message); if (!answer) view.body.textContent = item.error.message; }
       if (item.type === 'cancelled') showNotice('Upstream request cancelled.');
     });
   } catch (error) {
     showNotice(error.name === 'AbortError' ? 'Upstream request cancelled.' : error.message);
+    if (!answer) view.body.textContent = error.name === 'AbortError' ? 'Request cancelled.' : error.message;
   } finally {
     state.controller = null; busy(false); $('prompt').focus();
     refreshConversations().catch(() => {});
@@ -247,9 +251,10 @@ async function refreshMetrics() {
   const rows = $('metrics-rows'); rows.replaceChildren();
   for (const record of data.recent) {
     const tr = document.createElement('tr');
-    const values = [new Date(record.created_at).toLocaleString(), `${record.provider} / ${record.model_id}`,
+    const values = [new Date(record.created_at).toLocaleString(), record.tenant, `${record.provider} / ${record.model_id}`,
       record.ttft_ms == null ? '—' : `${record.ttft_ms} ms`, `${record.latency_ms} ms`,
       `${record.input_tokens ?? '—'} / ${record.output_tokens ?? '—'}`,
+      `${record.cached_input_tokens ?? '—'} / ${record.reasoning_tokens ?? '—'}`,
       record.cost_usd == null ? '—' : `$${record.cost_usd.toFixed(5)}`, record.finish_reason,
       `${record.retry_count} / ${record.fallback_used ? 'yes' : 'no'}`];
     for (const value of values) { const td = document.createElement('td'); td.textContent = value; tr.append(td); }

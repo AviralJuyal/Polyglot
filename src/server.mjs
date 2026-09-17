@@ -112,6 +112,7 @@ async function route(req, res) {
   }
   if (req.method === 'POST' && documentsPath) {
     getCollection(db, documentsPath[1]);
+    if (listDocuments(db, documentsPath[1]).length >= 20) throw new InputError('Collection is limited to 20 documents');
     let rawName;
     try { rawName = decodeURIComponent(String(req.headers['x-filename'] || '')); }
     catch { throw new InputError('Invalid filename'); }
@@ -139,7 +140,8 @@ async function route(req, res) {
     return;
   }
   if (req.method === 'GET' && url.pathname === '/api/metrics') {
-    json(res, 200, { tenant, ...metrics(db) }); return;
+    const report = metrics(db);
+    json(res, 200, { tenant, recent: report.recent.map(row => ({ tenant, ...row })), aggregate: report.aggregate }); return;
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     const body = await readJson(req);

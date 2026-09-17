@@ -100,3 +100,22 @@ test('tool loop feeds two sequential results back to the model', async () => {
   assert.equal(seen.filter(item => item.type === 'tool_result').length, 2);
   assert.equal(seen.find(item => item.type === 'done').finishReason, 'stop');
 });
+
+test('rate limits retry with backoff while auth failures do not retry', async () => {
+  let calls = 0;
+  handler = async () => {
+    calls++;
+    if (calls === 1) return new Response(JSON.stringify({ error: { message: 'rate limit' } }), { status: 429 });
+    return sse([
+      { choices: [{ delta: { content: 'Recovered' }, finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 4, completion_tokens: 1 } }
+    ]);
+  };
+  const db = tenantDb('tenant-b');
+  const seen = [];
+  await runChat({ db, text: 'retry once', modelId: 'openai:gpt-4.1-mini',
+    retrieval: { topK: 4, threshold: 0.35 }, enableTools: false, emit: item => seen.push(item) });
+  assert.equal(calls, 2);
+  assert.equal(seen.some(item => item.type === 'fallback'), false);
+  assert.equal(metrics(db).recent[0].retry_count, 1);
+});

@@ -14,10 +14,12 @@ This file records differences handled by the adapters. Pricing below reflects th
 
 The normalized event stream uses `tool_use_start`, `tool_use_delta`, and `tool_use_complete` for all three. For Gemini, the adapter emits a single JSON delta from its complete function-call object. For Anthropic and OpenAI, the adapter accumulates fragments and parses JSON only after the stream completes. Gemini thought signatures on function-call parts are preserved in the internal tool-use block for continuation turns.
 
+Gemini 2.5 Flash's configured thinking budget is 128 tokens. Its output limit includes thinking tokens, so leaving dynamic thinking unlimited under a 768-token response cap could end a response before visible text appears. [Gemini thinking configuration](https://ai.google.dev/gemini-api/docs/generate-content/thinking).
+
 Models and prices configured:
 
 - Anthropic `claude-haiku-4-5-20251001`: $1 input / $5 output / $0.10 cached input per million tokens. [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
-- Gemini `gemini-2.5-flash`: $0.30 text input / $2.50 output / $0.03 cached input per million tokens on the paid standard tier. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing).
+- Gemini `gemini-2.5-flash`: $0.30 text input / $2.50 output and thinking / $0.03 cached input per million tokens on the paid standard tier. Gemini reports thinking tokens separately, so the configured cost formula adds them to output billing. [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing), [thinking token accounting](https://ai.google.dev/gemini-api/docs/generate-content/thinking).
 - OpenAI `gpt-4.1-mini`: $0.40 input / $1.60 output / $0.10 cached input per million tokens. [OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
 
 Streaming references: [Anthropic Messages](https://platform.claude.com/docs/en/build-with-claude/streaming), [Gemini `streamGenerateContent`](https://ai.google.dev/api/generate-content), [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat/create). Gemini's [thought-signature guidance](https://ai.google.dev/gemini-api/docs/generate-content/thought-signatures) is relevant when replaying tool turns through the REST API.

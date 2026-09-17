@@ -62,5 +62,8 @@ export function costUsd(modelId, usage) {
   // Providers generally include cached input in inputTokens, so subtract before pricing it separately.
   const uncached = Math.max(0, usage.inputTokens - (usage.cachedInputTokens || 0));
   return (uncached * p.inputPerMTok + (usage.cachedInputTokens || 0) * (p.cachedInputPerMTok ?? p.inputPerMTok)
-    + usage.outputTokens * p.outputPerMTok) / 1_000_000;
+    + usage.outputTokens * p.outputPerMTok
+    // Gemini reports thought tokens separately from candidate output tokens. Other
+    // providers include reasoning in outputTokens, so only a configured rate adds them.
+    + (usage.reasoningTokens || 0) * (p.reasoningPerMTok || 0)) / 1_000_000;
 }

@@ -20,8 +20,9 @@
         "gemini:gemini-2.5-flash": {
           "providerModelId": "gemini-2.5-flash",
           "contextWindow": 1048576,
+          "thinkingBudget": 128,
           "capabilities": { "tools": true, "vision": true, "jsonSchema": true, "streaming": true },
-          "pricing": { "inputPerMTok": 0.3, "outputPerMTok": 2.5, "cachedInputPerMTok": 0.03 },
+          "pricing": { "inputPerMTok": 0.3, "outputPerMTok": 2.5, "reasoningPerMTok": 2.5, "cachedInputPerMTok": 0.03 },
           "pricingSource": "https://ai.google.dev/gemini-api/docs/pricing"
         }
       },

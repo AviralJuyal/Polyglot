@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polyglot AI Workbench</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div id="login" class="login-screen hidden">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark">P</div>
+      <h1>Polyglot</h1>
+      <p>Multi-provider AI workbench</p>
+      <label>Demo account
+        <select id="login-user"><option value="tenant-a">Tenant A</option><option value="tenant-b">Tenant B</option></select>
+      </label>
+      <label>Password <input id="login-password" type="password" required autocomplete="current-password"></label>
+      <button type="submit" class="primary">Sign in</button>
+      <div id="login-error" class="error-message" role="alert"></div>
+    </form>
+  </div>
+
+  <div id="app" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">P</span><span>Polyglot</span></div>
+      <div class="tenant-bar"><span id="tenant-label"></span><button id="logout" class="small-button">Sign out</button></div>
+      <button id="new-chat" class="new-chat">+ New conversation</button>
+      <h2>Conversations</h2>
+      <div id="conversation-list" class="conversation-list"></div>
+      <div class="side-footer">Each tenant has its own conversations, documents, and usage data.</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><h1>AI Workbench</h1><p>Switch models between messages. See the cost behind each answer.</p></div>
+        <nav class="tabs"><button class="tab active" data-tab="chat">Chat</button><button class="tab" data-tab="documents">Documents</button><button class="tab" data-tab="metrics">Metrics</button></nav>
+      </header>
+
+      <section id="chat-panel" class="panel active">
+        <div class="controls">
+          <label>Model <select id="model-select"></select></label>
+          <label>Document collection <select id="collection-select"><option value="">None</option></select></label>
+          <label>Top-k <input id="top-k" type="number" value="4" min="1" max="10" style="width:70px"></label>
+          <label>Threshold <input id="threshold" type="number" value="0.35" min="0" max="1" step="0.05" style="width:82px"></label>
+          <label class="checkbox"><input id="tools-toggle" type="checkbox"> Enable tools</label>
+        </div>
+        <div id="chat-notice" class="notice hidden"></div>
+        <div id="messages" class="messages"><div class="empty-state">Ask a question to start a conversation.</div></div>
+        <div id="source-tray" class="source-tray hidden"></div>
+        <form id="chat-form" class="composer">
+          <textarea id="prompt" rows="3" maxlength="4000" placeholder="Ask anything, or select a document collection to ground the answer..."></textarea>
+          <div class="composer-actions"><span>Enter to send · Shift+Enter for a new line</span><button id="stop" type="button" class="secondary hidden">Stop</button><button id="send" type="submit" class="primary">Send</button></div>
+        </form>
+      </section>
+
+      <section id="documents-panel" class="panel">
+        <div class="section-heading"><div><h2>Document collections</h2><p>Upload text, Markdown, or PDF files. Retrieval stays inside this tenant.</p></div></div>
+        <div class="two-column">
+          <div class="card">
+            <h3>Create a collection</h3>
+            <form id="collection-form" class="stack-form">
+              <label>Name <input id="collection-name" maxlength="80" required placeholder="e.g. Product notes"></label>
+              <label>Embedding model <select id="embedding-select"></select></label>
+              <div class="field-row"><label>Chunk size <input id="chunk-size" type="number" value="1500" min="400" max="4000"></label><label>Overlap <input id="overlap" type="number" value="200" min="0" max="1999"></label></div>
+              <button class="primary" type="submit">Create collection</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Upload and re-index</h3>
+            <form id="upload-form" class="stack-form">
+              <label>Collection <select id="upload-collection"></select></label>
+              <label>File <input id="upload-file" type="file" accept=".pdf,.txt,.md" required></label>
+              <button class="primary" type="submit">Upload document</button>
+            </form>
+            <div class="divider"></div>
+            <p class="help">Changing chunk size, overlap, or embedding model rebuilds the selected collection's index.</p>
+            <button id="reindex" class="secondary">Re-index with settings above</button>
+          </div>
+        </div>
+        <div class="card"><h3>Current collections</h3><div id="collection-list" class="collection-list"></div></div>
+        <div id="document-status" class="status-line" role="status"></div>
+      </section>
+
+      <section id="metrics-panel" class="panel">
+        <div class="section-heading"><div><h2>Usage and latency</h2><p id="metrics-tenant"></p></div><button id="refresh-metrics" class="secondary">Refresh</button></div>
+        <div id="aggregate" class="aggregate"></div>
+        <div class="card table-wrap"><h3>Recent provider requests</h3><table><thead><tr><th>Time</th><th>Provider / model</th><th>First token</th><th>Latency</th><th>Tokens in/out</th><th>Cost</th><th>Finish</th><th>Retry / fallback</th></tr></thead><tbody id="metrics-rows"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="chunk-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">×</button></form><h2 id="chunk-title"></h2><pre id="chunk-text"></pre></dialog>
+</body>
+</html>

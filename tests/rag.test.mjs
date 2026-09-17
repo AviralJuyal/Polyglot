@@ -57,6 +57,13 @@ test('legacy document column order preserves source text during upload and re-in
     id TEXT PRIMARY KEY, collection_id TEXT, filename TEXT, mime TEXT, char_count INTEGER,
     created_at TEXT, source_text TEXT
   )`);
+  legacy.exec(`CREATE TABLE usage_records (
+    id TEXT PRIMARY KEY, conversation_id TEXT, provider TEXT NOT NULL, model_id TEXT NOT NULL,
+    created_at TEXT NOT NULL, ttft_ms INTEGER, latency_ms INTEGER NOT NULL,
+    input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER,
+    reasoning_tokens INTEGER, cost_usd REAL, finish_reason TEXT NOT NULL,
+    retry_count INTEGER NOT NULL, fallback_used INTEGER NOT NULL, error_kind TEXT
+  )`);
   const oldText = 'The archived rehearsal uses a blue lantern.';
   const timestamp = '2026-09-17T12:00:00.000Z';
   legacy.prepare('INSERT INTO documents VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -72,6 +79,10 @@ test('legacy document column order preserves source text during upload and re-in
   assert.equal(storage.documentSources(db, collection.id)[0].source_text, newText);
   await reindexCollection(db, collection.id, { chunkSize: 400, overlap: 40 }, 'gemini:gemini-embedding-001');
   assert.equal(storage.collectionChunks(db, collection.id)[0].text, newText);
+  storage.recordUsage(db, { provider: 'anthropic', modelId: 'anthropic:claude-haiku-4-5-20251001',
+    latencyMs: 3, finishReason: 'stop', usage: { inputTokens: 18, outputTokens: 6,
+      cachedInputTokens: 3, cacheWriteTokens: 5, cacheWrite1hTokens: 2 }, costUsd: 0.00004805 });
+  assert.equal(storage.metrics(db).recent[0].cache_write_tokens, 5);
 });
 
 test('upload validation rejects mismatched PDF and HTML', async () => {
@@ -98,4 +109,9 @@ test('RAG chat persists inspectable citations and rejects an uncited answer', as
   await runChat({ db, text: 'Repeat apple facts?', modelId: 'openai:gpt-4.1-mini', collectionId: collection.id,
     retrieval: { topK: 3, threshold: 0.6 }, enableTools: false, emit: item => second.push(item) });
   assert.equal(second.find(item => item.type === 'replace_text').text, "I don't know based on these documents.");
+  completionText = "I don't know its color, but Apple is a fruit.";
+  const mixed = [];
+  await runChat({ db, text: 'Give an apple fact?', modelId: 'openai:gpt-4.1-mini', collectionId: collection.id,
+    retrieval: { topK: 3, threshold: 0.6 }, enableTools: false, emit: item => mixed.push(item) });
+  assert.equal(mixed.find(item => item.type === 'replace_text').text, "I don't know based on these documents.");
 });

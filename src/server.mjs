@@ -32,7 +32,13 @@ async function readBody(req, maxBytes = 32_000) {
 }
 
 async function readJson(req, maxBytes) {
-  try { return JSON.parse((await readBody(req, maxBytes)).toString('utf8')); }
+  try {
+    const body = JSON.parse((await readBody(req, maxBytes)).toString('utf8'));
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new InputError('JSON body must be an object');
+    }
+    return body;
+  }
   catch (error) {
     if (error instanceof InputError) throw error;
     throw new InputError('Invalid JSON body');

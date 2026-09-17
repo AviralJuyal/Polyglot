@@ -21,6 +21,7 @@ const demoUsers = new Map([
 function signature(payload) { return createHmac('sha256', secret).update(payload).digest('base64url'); }
 
 export function authenticate(username, password) {
+  if (typeof username !== 'string' || typeof password !== 'string') return null;
   const user = demoUsers.get(username);
   if (!user) return null;
   const left = Buffer.from(password);

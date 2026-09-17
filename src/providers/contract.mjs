@@ -9,7 +9,8 @@
  * @typedef {{name:string, description:string, parameters:object}} ToolDefinition
  * @typedef {{model:string, messages:Message[], system?:string, tools?:ToolDefinition[],
  *   maxTokens?:number, temperature?:number, signal?:AbortSignal}} CompletionRequest
- * @typedef {{inputTokens:number, outputTokens:number, cachedInputTokens?:number, reasoningTokens?:number}} Usage
+ * @typedef {{inputTokens:number, outputTokens:number, cachedInputTokens?:number,
+ *   cacheWriteTokens?:number, cacheWrite1hTokens?:number, reasoningTokens?:number}} Usage
  * @typedef {{type:'text_delta', text:string} | {type:'tool_use_start', id:string, name:string} |
  *   {type:'tool_use_delta', id:string, partialJson:string} |
  *   {type:'tool_use_complete', id:string, name:string, input:object, thoughtSignature?:string} |

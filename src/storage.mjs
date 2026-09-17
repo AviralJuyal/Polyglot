@@ -48,6 +48,7 @@ export function tenantDb(tenant) {
       id TEXT PRIMARY KEY, conversation_id TEXT, provider TEXT NOT NULL, model_id TEXT NOT NULL,
       created_at TEXT NOT NULL, ttft_ms INTEGER, latency_ms INTEGER NOT NULL,
       input_tokens INTEGER, output_tokens INTEGER, cached_input_tokens INTEGER,
+      cache_write_tokens INTEGER, cache_write_1h_tokens INTEGER,
       reasoning_tokens INTEGER, cost_usd REAL, finish_reason TEXT NOT NULL,
       retry_count INTEGER NOT NULL, fallback_used INTEGER NOT NULL, error_kind TEXT
     );
@@ -55,6 +56,9 @@ export function tenantDb(tenant) {
   if (!db.prepare('PRAGMA table_info(documents)').all().some(column => column.name === 'source_text')) {
     db.exec("ALTER TABLE documents ADD COLUMN source_text TEXT NOT NULL DEFAULT ''");
   }
+  const usageColumns = new Set(db.prepare('PRAGMA table_info(usage_records)').all().map(column => column.name));
+  if (!usageColumns.has('cache_write_tokens')) db.exec('ALTER TABLE usage_records ADD COLUMN cache_write_tokens INTEGER');
+  if (!usageColumns.has('cache_write_1h_tokens')) db.exec('ALTER TABLE usage_records ADD COLUMN cache_write_1h_tokens INTEGER');
   // Early local databases appended source_text after created_at. A positional INSERT
   // briefly swapped those two values; recover rows we can identify unambiguously.
   const misplaced = db.prepare('SELECT id, source_text, created_at, char_count FROM documents').all()
@@ -158,10 +162,16 @@ export function getChunk(db, id) {
   return row;
 }
 export function recordUsage(db, value) {
-  db.prepare(`INSERT INTO usage_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  // Name columns so migrations can add observability fields without changing old files' order.
+  db.prepare(`INSERT INTO usage_records
+    (id, conversation_id, provider, model_id, created_at, ttft_ms, latency_ms,
+     input_tokens, output_tokens, cached_input_tokens, cache_write_tokens, cache_write_1h_tokens,
+     reasoning_tokens, cost_usd, finish_reason, retry_count, fallback_used, error_kind)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(randomUUID(), value.conversationId || null, value.provider, value.modelId, new Date().toISOString(),
       value.ttftMs ?? null, value.latencyMs, value.usage?.inputTokens ?? null,
       value.usage?.outputTokens ?? null, value.usage?.cachedInputTokens ?? null,
+      value.usage?.cacheWriteTokens ?? null, value.usage?.cacheWrite1hTokens ?? null,
       value.usage?.reasoningTokens ?? null, value.costUsd ?? null, value.finishReason,
       value.retryCount || 0, value.fallbackUsed ? 1 : 0, value.errorKind || null);
 }

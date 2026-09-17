@@ -41,6 +41,7 @@ npm test
 - Citations are requested from the model and only known markers become clickable. The app exposes retrieved chunks, but it does not automatically verify that every factual sentence is supported by its citation.
 - The vector store is an exact cosine scan over tenant-local chunks, capped by upload and chunk limits. It is intentionally sized for a take-home, not large collections.
 - PDF extraction handles selectable text; scanned PDFs need OCR, which is outside this scope.
+- The provider contract can translate image blocks, but the browser chat form does not accept image attachments.
 - Cost covers model completions. Embedding, weather, and infrastructure costs are not included in the spend panel.
 - A failed stream after visible output is surfaced as an interrupted answer; the app does not splice a fallback model into an already-started response.
 - Optional extras from the assignment are not implemented.

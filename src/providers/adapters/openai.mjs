@@ -7,6 +7,7 @@ export function toOpenAIMessages(request) {
   const result = request.system ? [{ role: 'system', content: request.system }] : [];
   for (const message of request.messages) {
     const text = message.content.filter(block => block.type === 'text').map(block => block.text || '').join('\n');
+    const images = message.content.filter(block => block.type === 'image');
     const calls = message.content.filter(block => block.type === 'tool_use');
     if (message.role === 'tool') {
       for (const block of message.content.filter(block => block.type === 'tool_result')) {
@@ -17,7 +18,13 @@ export function toOpenAIMessages(request) {
         id: block.id, type: 'function', function: { name: block.name, arguments: JSON.stringify(block.input || {}) }
       })) });
     } else {
-      result.push({ role: message.role, content: text });
+      // Chat Completions requires typed content parts whenever a user turn has an image.
+      const content = images.length ? message.content.flatMap(block => {
+        if (block.type === 'text') return [{ type: 'text', text: block.text || '' }];
+        if (block.type === 'image') return [{ type: 'image_url', image_url: { url: `data:${block.mimeType};base64,${block.data}` } }];
+        return [];
+      }) : text;
+      result.push({ role: message.role, content });
     }
   }
   return result;
@@ -67,16 +74,19 @@ export function createProvider({ name, apiKey, fetchImpl = fetch }) {
           if (!choice) continue;
           if (choice.delta?.content) yield { type: 'text_delta', text: choice.delta.content };
           for (const delta of choice.delta?.tool_calls || []) {
-            const existing = calls.get(delta.index) || { id: '', name: '', json: '', started: false };
+            const existing = calls.get(delta.index) || { id: '', name: '', json: '', sentChars: 0, started: false };
             if (delta.id) existing.id = delta.id;
             if (delta.function?.name) existing.name += delta.function.name;
-            if (existing.id && existing.name && !existing.started) {
+            if (delta.function?.arguments) existing.json += delta.function.arguments;
+            // Some streams deliver argument bytes before the ID/name. Buffer until
+            // the call can be identified, then emit the buffered bytes once.
+            if (existing.id && existing.name && existing.json && !existing.started) {
               existing.started = true;
               yield { type: 'tool_use_start', id: existing.id, name: existing.name };
             }
-            if (delta.function?.arguments) {
-              existing.json += delta.function.arguments;
-              yield { type: 'tool_use_delta', id: existing.id, partialJson: delta.function.arguments };
+            if (existing.started && existing.json.length > existing.sentChars) {
+              yield { type: 'tool_use_delta', id: existing.id, partialJson: existing.json.slice(existing.sentChars) };
+              existing.sentChars = existing.json.length;
             }
             calls.set(delta.index, existing);
           }
@@ -84,6 +94,8 @@ export function createProvider({ name, apiKey, fetchImpl = fetch }) {
             : choice.finish_reason === 'length' ? 'max_tokens' : choice.finish_reason === 'content_filter' ? 'content_filter' : 'stop';
         }
         for (const call of calls.values()) {
+          if (!call.id || !call.name) throw new ProviderError('bad_request', name, 'Incomplete streamed tool call');
+          if (!call.started) yield { type: 'tool_use_start', id: call.id, name: call.name };
           let input;
           try { input = JSON.parse(call.json || '{}'); } catch { throw new ProviderError('bad_request', name, 'Invalid streamed tool arguments'); }
           yield { type: 'tool_use_complete', id: call.id, name: call.name, input };

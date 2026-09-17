@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createProvider as anthropic, toAnthropicMessages } from '../src/providers/adapters/anthropic.mjs';
 import { createProvider as gemini, toGeminiContents } from '../src/providers/adapters/gemini.mjs';
 import { createProvider as openai, toOpenAIMessages } from '../src/providers/adapters/openai.mjs';
+import { costUsd } from '../src/config.mjs';
 
 const textMessage = { role: 'user', content: [{ type: 'text', text: 'hello' }] };
 const tool = { name: 'calculator', description: 'Calculate', parameters: { type: 'object', properties: {
@@ -42,7 +43,9 @@ test('Anthropic adapter keeps system separate and combines JSON deltas', async (
   const provider = anthropic({ name: 'anthropic', apiKey: 'test', fetchImpl: async (_url, options) => {
     sent = JSON.parse(options.body);
     return streamResponse([
-      { type: 'message_start', message: { usage: { input_tokens: 10, output_tokens: 1 } } },
+      { type: 'message_start', message: { usage: { input_tokens: 10, output_tokens: 1,
+        cache_read_input_tokens: 3, cache_creation_input_tokens: 5,
+        cache_creation: { ephemeral_1h_input_tokens: 2, ephemeral_5m_input_tokens: 3 } } } },
       { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu_1', name: 'calculator' } },
       { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"expression":' } },
       { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '"8/2"}' } },
@@ -54,7 +57,38 @@ test('Anthropic adapter keeps system separate and combines JSON deltas', async (
   assert.equal(sent.messages[0].role, 'user');
   assert.equal(sent.tools[0].input_schema.type, 'object');
   assert.equal(result.find(event => event.type === 'tool_use_complete').input.expression, '8/2');
-  assert.equal(result.find(event => event.type === 'usage').usage.outputTokens, 6);
+  const usage = result.find(event => event.type === 'usage').usage;
+  assert.equal(usage.outputTokens, 6);
+  assert.equal(usage.inputTokens, 18);
+  assert.equal(usage.cachedInputTokens, 3);
+  assert.equal(usage.cacheWriteTokens, 5);
+  assert.equal(costUsd('anthropic:claude-haiku-4-5-20251001', usage), 48.05 / 1_000_000);
+});
+
+test('OpenAI adapter preserves image blocks in the portable message format', () => {
+  const messages = toOpenAIMessages({ messages: [{ role: 'user', content: [
+    { type: 'text', text: 'Describe this image' },
+    { type: 'image', mimeType: 'image/png', data: 'AQID' },
+    { type: 'text', text: 'Briefly' }
+  ] }] });
+  assert.deepEqual(messages[0].content, [
+    { type: 'text', text: 'Describe this image' },
+    { type: 'image_url', image_url: { url: 'data:image/png;base64,AQID' } },
+    { type: 'text', text: 'Briefly' }
+  ]);
+});
+
+test('OpenAI tool deltas buffer arguments until a call ID arrives', async () => {
+  const provider = openai({ name: 'openai', apiKey: 'test', fetchImpl: async () => streamResponse([
+    { choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"expression":' } }] } }] },
+    { choices: [{ delta: { tool_calls: [{ index: 0, id: 'late_id', function: {
+      name: 'calculator', arguments: '"2+3"}' } }] }, finish_reason: 'tool_calls' }] }
+  ]) });
+  const result = await events(provider, 'openai:gpt-4.1-mini');
+  assert.equal(result.find(event => event.type === 'tool_use_start').id, 'late_id');
+  assert.equal(result.filter(event => event.type === 'tool_use_delta').map(event => event.partialJson).join(''),
+    '{"expression":"2+3"}');
+  assert.equal(result.find(event => event.type === 'tool_use_complete').input.expression, '2+3');
 });
 
 test('Gemini adapter maps roles and emits normalized tool events', async () => {

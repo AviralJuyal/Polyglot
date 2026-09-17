@@ -8,7 +8,7 @@
           "providerModelId": "claude-haiku-4-5-20251001",
           "contextWindow": 200000,
           "capabilities": { "tools": true, "vision": true, "jsonSchema": false, "streaming": true },
-          "pricing": { "inputPerMTok": 1, "outputPerMTok": 5, "cachedInputPerMTok": 0.1 },
+          "pricing": { "inputPerMTok": 1, "outputPerMTok": 5, "cachedInputPerMTok": 0.1, "cacheWrite5mPerMTok": 1.25, "cacheWrite1hPerMTok": 2 },
           "pricingSource": "https://platform.claude.com/docs/en/about-claude/pricing"
         }
       }

@@ -59,9 +59,14 @@ export function publicCatalog() {
 export function costUsd(modelId, usage) {
   if (!usage) return null;
   const p = modelConfig(modelId).pricing;
-  // Providers generally include cached input in inputTokens, so subtract before pricing it separately.
-  const uncached = Math.max(0, usage.inputTokens - (usage.cachedInputTokens || 0));
+  // The portable input count includes cache reads and writes. Anthropic reports
+  // those separately upstream, so its adapter first combines all three buckets.
+  const cacheWrite = usage.cacheWriteTokens || 0;
+  const cacheWrite1h = Math.min(cacheWrite, usage.cacheWrite1hTokens || 0);
+  const uncached = Math.max(0, usage.inputTokens - (usage.cachedInputTokens || 0) - cacheWrite);
   return (uncached * p.inputPerMTok + (usage.cachedInputTokens || 0) * (p.cachedInputPerMTok ?? p.inputPerMTok)
+    + (cacheWrite - cacheWrite1h) * (p.cacheWrite5mPerMTok ?? p.inputPerMTok)
+    + cacheWrite1h * (p.cacheWrite1hPerMTok ?? p.inputPerMTok)
     + usage.outputTokens * p.outputPerMTok
     // Gemini reports thought tokens separately from candidate output tokens. Other
     // providers include reasoning in outputTokens, so only a configured rate adds them.

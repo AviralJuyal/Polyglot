@@ -254,7 +254,7 @@ async function refreshMetrics() {
     const values = [new Date(record.created_at).toLocaleString(), record.tenant, `${record.provider} / ${record.model_id}`,
       record.ttft_ms == null ? '—' : `${record.ttft_ms} ms`, `${record.latency_ms} ms`,
       `${record.input_tokens ?? '—'} / ${record.output_tokens ?? '—'}`,
-      `${record.cached_input_tokens ?? '—'} / ${record.reasoning_tokens ?? '—'}`,
+      `${record.cached_input_tokens ?? '—'} / ${record.cache_write_tokens ?? '—'} / ${record.reasoning_tokens ?? '—'}`,
       record.cost_usd == null ? '—' : `$${record.cost_usd.toFixed(5)}`, record.finish_reason,
       `${record.retry_count} / ${record.fallback_used ? 'yes' : 'no'}`];
     for (const value of values) { const td = document.createElement('td'); td.textContent = value; tr.append(td); }

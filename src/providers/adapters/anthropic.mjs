@@ -51,8 +51,12 @@ export function createProvider({ name, apiKey, fetchImpl = fetch }) {
           if (packet.type === 'error') throw new ProviderError('server_error', name, `${name} stream failed`, { raw: packet.error });
           if (packet.type === 'message_start') {
             const u = packet.message?.usage || {};
-            usage = { inputTokens: u.input_tokens || 0, outputTokens: u.output_tokens || 0,
-              cachedInputTokens: u.cache_read_input_tokens };
+            const cachedInputTokens = u.cache_read_input_tokens || 0;
+            const cacheWriteTokens = u.cache_creation_input_tokens || 0;
+            // Anthropic reports uncached, cache-read, and cache-write input separately.
+            usage = { inputTokens: (u.input_tokens || 0) + cachedInputTokens + cacheWriteTokens,
+              outputTokens: u.output_tokens || 0, cachedInputTokens, cacheWriteTokens,
+              cacheWrite1hTokens: u.cache_creation?.ephemeral_1h_input_tokens || 0 };
           }
           if (packet.type === 'content_block_start' && packet.content_block?.type === 'tool_use') {
             const block = packet.content_block;

@@ -7,6 +7,8 @@ Polyglot is a small web app for streaming chat across Anthropic, Gemini, and Ope
 Requirements: **Node.js 26 or later** and **Python 3.9 or later**. No npm packages are required. Python's `pypdf` package is needed only for PDF uploads.
 
 ```bash
+git clone https://github.com/AviralJuyal/Polyglot.git
+cd Polyglot
 cp .env.example .env
 python3 -m pip install -r requirements.txt
 npm start

@@ -55,6 +55,20 @@ export function tenantDb(tenant) {
   if (!db.prepare('PRAGMA table_info(documents)').all().some(column => column.name === 'source_text')) {
     db.exec("ALTER TABLE documents ADD COLUMN source_text TEXT NOT NULL DEFAULT ''");
   }
+  // Early local databases appended source_text after created_at. A positional INSERT
+  // briefly swapped those two values; recover rows we can identify unambiguously.
+  const misplaced = db.prepare('SELECT id, source_text, created_at, char_count FROM documents').all()
+    .filter(row => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.source_text)
+      && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.created_at)
+      && row.created_at.length === row.char_count);
+  if (misplaced.length) {
+    db.exec('BEGIN');
+    try {
+      const fix = db.prepare('UPDATE documents SET source_text = ?, created_at = ? WHERE id = ?');
+      for (const row of misplaced) fix.run(row.created_at, row.source_text, row.id);
+      db.exec('COMMIT');
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
   open.set(tenant, db);
   return db;
 }
@@ -100,7 +114,9 @@ export function addDocumentWithChunks(db, collectionId, filename, mime, text, ch
   const id = randomUUID();
   db.exec('BEGIN');
   try {
-    db.prepare('INSERT INTO documents VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, collectionId,
+    db.prepare(`INSERT INTO documents
+      (id, collection_id, filename, mime, char_count, source_text, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(id, collectionId,
       filename, mime, text.length, text, new Date().toISOString());
     const insert = db.prepare('INSERT INTO chunks VALUES (?, ?, ?, ?, ?, ?)');
     chunks.forEach((chunk, index) => insert.run(randomUUID(), id, collectionId, index + 1, chunk, JSON.stringify(vectors[index])));

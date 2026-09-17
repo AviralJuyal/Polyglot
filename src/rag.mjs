@@ -111,6 +111,9 @@ export async function reindexCollection(db, collectionId, settings, embeddingMod
   getCollection(db, collectionId);
   embeddingConfig(embeddingModel);
   const documents = documentSources(db, collectionId);
+  if (documents.some(document => !document.source_text)) {
+    throw new InputError('This collection contains an older document without saved source text; re-upload it before re-indexing');
+  }
   const indexed = [];
   for (const document of documents) {
     const chunks = chunkText(document.source_text, settings.chunkSize, settings.overlap);

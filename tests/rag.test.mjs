@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
 
 process.env.POLYGLOT_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'polyglot-rag-test-'));
 process.env.GEMINI_API_KEY = 'fixture-key';
@@ -31,6 +33,7 @@ test('RAG chunks, embeds, retrieves and re-indexes within one tenant', async () 
   const collection = storage.createCollection(a, { name: 'Fruit notes', embeddingModel: 'gemini:gemini-embedding-001',
     chunkSize: 400, overlap: 40 });
   const apple = await ingestDocument(a, collection.id, Buffer.from('Apple growing notes. '.repeat(12)), 'apple.txt', 'text/plain');
+  assert.match(storage.documentSources(a, collection.id)[0].source_text, /Apple growing notes/);
   await ingestDocument(a, collection.id, Buffer.from('Banana transport notes. '.repeat(12)), 'banana.md', 'text/markdown');
   const matches = await retrieve(a, collection.id, 'apple', { topK: 3, threshold: 0.6 });
   assert.equal(matches.length, 1);
@@ -41,6 +44,34 @@ test('RAG chunks, embeds, retrieves and re-indexes within one tenant', async () 
     'gemini:gemini-embedding-001');
   assert.equal(reindexed.documents, 2);
   assert.equal(storage.getCollection(a, collection.id).chunk_size, 600);
+});
+
+test('legacy document column order preserves source text during upload and re-index', async () => {
+  const tenant = 'tenant-legacy';
+  const directory = path.join(process.env.POLYGLOT_DATA_DIR, 'tenants');
+  fs.mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, `${createHash('sha256').update(tenant).digest('hex')}.sqlite`);
+  const legacy = new DatabaseSync(file);
+  // This order existed before source_text was added, so INSERT without column names was unsafe.
+  legacy.exec(`CREATE TABLE documents (
+    id TEXT PRIMARY KEY, collection_id TEXT, filename TEXT, mime TEXT, char_count INTEGER,
+    created_at TEXT, source_text TEXT
+  )`);
+  const oldText = 'The archived rehearsal uses a blue lantern.';
+  const timestamp = '2026-09-17T12:00:00.000Z';
+  legacy.prepare('INSERT INTO documents VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('legacy-document', 'archived-collection', 'old.txt', 'text/plain', oldText.length, oldText, timestamp);
+  legacy.close();
+
+  const db = storage.tenantDb(tenant);
+  assert.equal(db.prepare('SELECT source_text FROM documents WHERE id = ?').get('legacy-document').source_text, oldText);
+  const collection = storage.createCollection(db, { name: 'Legacy schema',
+    embeddingModel: 'gemini:gemini-embedding-001', chunkSize: 400, overlap: 40 });
+  const newText = 'Apple facts remain available after re-indexing.';
+  storage.addDocumentWithChunks(db, collection.id, 'new.txt', 'text/plain', newText, [newText], [[1, 0]]);
+  assert.equal(storage.documentSources(db, collection.id)[0].source_text, newText);
+  await reindexCollection(db, collection.id, { chunkSize: 400, overlap: 40 }, 'gemini:gemini-embedding-001');
+  assert.equal(storage.collectionChunks(db, collection.id)[0].text, newText);
 });
 
 test('upload validation rejects mismatched PDF and HTML', async () => {

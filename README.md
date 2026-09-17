@@ -29,11 +29,11 @@ npm test
 | Provider abstraction | Three adapters, normalized messages/events/errors, configuration-driven model registry and pricing. Mocked HTTP tests pass. |
 | Streaming chat | Browser SSE stream, SQLite persistence, provider/model switch between turns, upstream abort, conservative context-length rejection. |
 | Document retrieval | PDF/TXT/Markdown ingestion, chunking, Gemini/OpenAI embedding adapters, cosine retrieval, inline citation markers and clickable source chunks, runtime retrieval settings and collection re-indexing. |
-| Tool calling | Calculator, Open-Meteo weather, and document search; normalized tool definitions and a bounded multi-call loop. Adapter tool-stream mappings are fixture-tested. Live tool loops still need provider-key verification. |
+| Tool calling | Calculator, Open-Meteo weather, and document search; normalized tool definitions and a bounded multi-call loop. All three tools were exercised live through both Gemini and OpenAI. |
 | Metrics and resilience | Per-provider request metrics, cost from config, aggregate view, timeouts, selective retries with jitter, and a config-driven fallback chain. Fallback only occurs before visible stream output. |
 | Tenant boundary | Signed demo session chooses a separate SQLite database per tenant. Conversations, files, chunks, citations, and usage records never share a database connection. |
 
-**Live-key status:** Gemini, OpenAI, and Anthropic have not yet been verified against live API keys in this checkout. The adapter and orchestration tests use mocked HTTP streams. Anthropic has no live key available at the time of writing; its test fixtures exercise the documented request/response shape. Update this section after live smoke tests. PDF extraction has been tested locally with the `pypdf` helper.
+**Live-key status (17 September 2026):** Gemini 2.5 Flash and OpenAI GPT-4.1 mini passed real streaming chat, model switching in one conversation, and calculator, weather, and document-search tool calls. A TXT upload using OpenAI embeddings produced a cited Gemini answer and an inspectable chunk; the empty-retrieval path answered "I don't know." The collection was re-indexed with Gemini embeddings and answered a cited OpenAI query. These are small smoke checks, not exhaustive live tests. Anthropic has no live key available in this checkout; its mocked HTTP fixtures exercise the documented request/response shape. PDF extraction has been tested locally with the `pypdf` helper.
 
 ## Known limits and scope cuts
 
